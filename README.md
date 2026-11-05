@@ -32,7 +32,7 @@ reviewer:
 | `dev`        | the build      | start building this version               |
 | `qa`         | the spot check | QA looked at the build and it is fine     |
 | `production` | the publish    | create the draft GitHub release; the comment is its notes |
-| `social`     | the announce   | post about it                             |
+| `social`     | the announces  | post on the socials named in the comment, one line each |
 
 ### In the web UI
 
@@ -74,7 +74,17 @@ Actions > Release > **Run workflow**, enter a version, run. Then:
    and approve `production`: a draft release "Release 1.2.3" with tag `v1.2.3`
    appears under Releases, with the artifact attached and your comment as its
    notes. The tag itself is only created when someone publishes the draft.
-4. `Announce` waits in turn.
+4. The three `Announce on …` jobs wait on the one `social` environment, so one
+   approval releases all three. The comment says which socials to post on and
+   what, one line per social:
+
+   ```
+   youtube: Version 1.2.3 is out, watch the video
+   discord: @everyone 1.2.3 is out!
+   ```
+
+   Each job takes its own line and prints what it would post. A social without
+   a line is skipped with a notice, here `x`.
 
 Try one run approving everything, and one rejecting at `qa`: the QA job fails,
 and publish and announce are skipped.
@@ -99,8 +109,10 @@ such as "minor issues: publish to the safe places only", use one of these:
 - One environment per outcome, each gating its own job. The reviewer approves
   the job that applies and rejects the other.
 - A second workflow started by hand with an input that carries the decision.
-- Reading the approval comment through the API (`GET
-  /repos/OWNER/REPO/actions/runs/RUN_ID/approvals`) in a later job.
+- Reading the approval comment in a later job, as the announce jobs do: one
+  gate, a comment with one line per social, and each job takes its line or
+  skips. Note that one approval releases every job waiting on that
+  environment, so the comment is the only way to tell them apart.
 
 Other things an environment can do: delay a job with a wait timer, restrict
 which branches or tags may deploy, and hold secrets that only its job can read,

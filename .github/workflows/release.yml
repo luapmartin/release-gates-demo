@@ -103,13 +103,37 @@ jobs:
         echo "Notes: ${notes}"
 
   announce:
-    name: Announce
+    name: 'Announce on ${{ matrix.social }}'
     needs: publish
     runs-on: ubuntu-24.04
-    environment: social # gate 4: approve to post; the social media tokens would be secrets of this environment only
+    permissions:
+      actions: read # to read the approval comment
+    strategy:
+      fail-fast: false # a failed post on one social must not cancel the others
+      matrix:
+        social: [youtube, x, discord]
+    # gate 4: one approval of `social` releases all three jobs at once, so the
+    # comment says which socials to post on and what, one line each:
+    #   youtube: Version 1.2.3 is out, watch the video
+    #   discord: @everyone 1.2.3 is out!
+    # A social without a line is skipped. The social media tokens would be
+    # secrets of this environment, read by no other job.
+    environment: social
     steps:
+    - name: Clone repository # for .github/scripts
+      uses: actions/checkout@v7
+
     - name: Post
       env:
-        VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ github.token }}
+        SOCIAL: ${{ matrix.social }}
       run: |
-        echo "Posted the release ${VERSION} to the socials"
+        comment="$(.github/scripts/approval_comment.sh social | tr -d '\r')"
+        text="$(grep -i "^${SOCIAL}:" <<<"${comment}" | sed 's/^[^:]*: *//' || true)"
+        if [[ -z "${text}" ]]; then
+          echo "::notice ::Nothing to post on ${SOCIAL}: the approval comment has no '${SOCIAL}:' line"
+          exit 0
+        fi
+
+        echo "Posted to ${SOCIAL}:"
+        echo "${text}"
