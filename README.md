@@ -24,7 +24,7 @@ private ones.
 
 ## Environments to set up
 
-Create these four environments, each with you (or your team) as required
+Create these six environments, each with you (or your team) as required
 reviewer:
 
 | Environment  | Gates          | Approving means                           |
@@ -32,7 +32,12 @@ reviewer:
 | `dev`        | the build      | start building this version               |
 | `qa`         | the spot check | QA looked at the build and it is fine     |
 | `production` | the publish    | create the draft GitHub release; the comment is its notes |
-| `social`     | the announces  | post on the socials named in the comment, one line each |
+| `youtube`    | one announce   | post on YouTube; the comment is the post  |
+| `x`          | one announce   | post on X; the comment is the post        |
+| `discord`    | one announce   | post on Discord; the comment is the post  |
+
+In a real setup each environment would have its own reviewers: QA people on
+`qa`, the social media people on `youtube`, `x` and `discord`.
 
 ### In the web UI
 
@@ -41,14 +46,14 @@ reviewer:
 3. To approve your own runs, untick **Prevent self-review** (it is ticked by
    default).
 4. Leave **Deployment branches and tags** on "No restriction" for the demo.
-5. Repeat for `qa`, `production` and `social`.
+5. Repeat for `qa`, `production`, `youtube`, `x` and `discord`.
 
 ### With the GitHub CLI
 
 Same result from a terminal. Find your user id with `gh api user --jq .id`.
 
 ```sh
-for env in dev qa production social; do
+for env in dev qa production youtube x discord; do
   gh api --method PUT "repos/OWNER/REPO/environments/${env}" \
     --input - <<EOF
 { "reviewers": [{ "type": "User", "id": YOUR_USER_ID }],
@@ -74,17 +79,12 @@ Actions > Release > **Run workflow**, enter a version, run. Then:
    and approve `production`: a draft release "Release 1.2.3" with tag `v1.2.3`
    appears under Releases, with the artifact attached and your comment as its
    notes. The tag itself is only created when someone publishes the draft.
-4. The three `Announce on …` jobs wait on the one `social` environment, so one
-   approval releases all three. The comment says which socials to post on and
-   what, one line per social:
-
-   ```
-   youtube: Version 1.2.3 is out, watch the video
-   discord: @everyone 1.2.3 is out!
-   ```
-
-   Each job takes its own line and prints what it would post. A social without
-   a line is skipped with a notice, here `x`.
+4. The three `Announce on …` jobs wait, each on its own environment, for as
+   long as it takes. Approve them one at a time, in any order, days apart if
+   need be, with the post as the approval comment: the job prints what it
+   would post. Reject the socials not wanted for this release; the others are
+   unaffected. Approving without a comment fails that job, since there is
+   nothing to post; re-run it to get a fresh approval.
 
 Try one run approving everything, and one rejecting at `qa`: the QA job fails,
 and publish and announce are skipped.
@@ -107,13 +107,18 @@ A gate is approve or reject, nothing more. If the decision has more outcomes,
 such as "minor issues: publish to the safe places only", use one of these:
 
 - One environment per outcome, each gating its own job. The reviewer approves
-  the job that applies and rejects the other.
+  the job that applies and rejects the other. The announce jobs do this: one
+  environment per social, with `fail-fast: false` on the matrix so a rejection
+  does not cancel the others.
 - A second workflow started by hand with an input that carries the decision.
-- Reading the approval comment in a later job, as the announce jobs do: one
-  gate, a comment with one line per social, and each job takes its line or
-  skips. Note that one approval releases every job waiting on that
-  environment, so the comment is the only way to tell them apart.
+- Reading the approval comment in a later job, as the publish and announce
+  jobs do.
+
+Jobs that share one environment are released together: one approval of that
+environment, with one comment, starts every job waiting on it. That is why
+each social has its own environment here, so they can be approved one at a
+time with their own text.
 
 Other things an environment can do: delay a job with a wait timer, restrict
 which branches or tags may deploy, and hold secrets that only its job can read,
-so social media tokens live in `social` and the build job never sees them.
+so the X tokens live in `x` and no other job sees them.

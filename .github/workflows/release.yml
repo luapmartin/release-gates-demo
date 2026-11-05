@@ -10,7 +10,7 @@ run-name: 'Release ${{ inputs.version }}'
 # skipped, so the chain stops there.
 #
 # Environments to create (Settings > Environments, see README.md):
-#   dev, qa, production, social - each with "Required reviewers".
+#   dev, qa, production, youtube, x, discord - each with "Required reviewers".
 # Without them the jobs run straight through: an environment that does not
 # exist is created on first use, with no protection.
 #
@@ -109,16 +109,14 @@ jobs:
     permissions:
       actions: read # to read the approval comment
     strategy:
-      fail-fast: false # a failed post on one social must not cancel the others
+      fail-fast: false # a rejected or failed social must not cancel the others
       matrix:
         social: [youtube, x, discord]
-    # gate 4: one approval of `social` releases all three jobs at once, so the
-    # comment says which socials to post on and what, one line each:
-    #   youtube: Version 1.2.3 is out, watch the video
-    #   discord: @everyone 1.2.3 is out!
-    # A social without a line is skipped. The social media tokens would be
-    # secrets of this environment, read by no other job.
-    environment: social
+    # gates 4: one environment per social, each approved on its own, whenever
+    # its people are ready, with the post as the approval comment. Reject the
+    # socials not wanted for this release. Each social's tokens would be
+    # secrets of its own environment, read by no other job.
+    environment: ${{ matrix.social }}
     steps:
     - name: Clone repository # for .github/scripts
       uses: actions/checkout@v7
@@ -128,11 +126,10 @@ jobs:
         GH_TOKEN: ${{ github.token }}
         SOCIAL: ${{ matrix.social }}
       run: |
-        comment="$(.github/scripts/approval_comment.sh social | tr -d '\r')"
-        text="$(grep -i "^${SOCIAL}:" <<<"${comment}" | sed 's/^[^:]*: *//' || true)"
+        text="$(.github/scripts/approval_comment.sh "${SOCIAL}")"
         if [[ -z "${text}" ]]; then
-          echo "::notice ::Nothing to post on ${SOCIAL}: the approval comment has no '${SOCIAL}:' line"
-          exit 0
+          echo "::error ::Nothing to post: approve ${SOCIAL} with the post as the comment (re-run this job to try again)"
+          exit 1
         fi
 
         echo "Posted to ${SOCIAL}:"
