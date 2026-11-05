@@ -1,0 +1,92 @@
+name: Release
+run-name: 'Release ${{ inputs.version }}'
+
+# A release with humans in the loop, as a chain of gated jobs.
+#
+# Each job below names a GitHub environment. When the run reaches that job,
+# GitHub pauses it until a required reviewer of the environment approves it on
+# the run page (Actions > this run > "Review deployments"). The reviewer can
+# leave a comment. A rejection fails the job, and every job that `needs` it is
+# skipped, so the chain stops there.
+#
+# Environments to create (Settings > Environments, see README.md):
+#   dev, qa, production, social - each with "Required reviewers".
+# Without them the jobs run straight through: an environment that does not
+# exist is created on first use, with no protection.
+#
+# Run it from Actions > Release > "Run workflow".
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.2.3'
+        required: true
+        default: '0.0.1'
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    environment: dev # gate 1: approve to start the build
+    steps:
+    - name: Build
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        mkdir out
+        echo "app ${VERSION}, build ${GITHUB_RUN_NUMBER}, from ${GITHUB_SHA}" > "out/app-${VERSION}.txt"
+        cat out/*
+
+    - name: Upload the build # the artifact is what QA checks and what gets published
+      uses: actions/upload-artifact@v7
+      with:
+        name: build
+        path: out/
+
+  qa:
+    name: QA spot check
+    needs: build
+    runs-on: ubuntu-24.04
+    environment: qa # gate 2: the approval is the spot check; reject when QA fails
+    steps:
+    - name: Download the build
+      uses: actions/download-artifact@v8
+      with:
+        name: build
+        path: out
+
+    - name: Spot check passed
+      run: |
+        cat out/*
+        echo "QA passed: a reviewer approved the qa environment"
+
+  publish:
+    name: Publish
+    needs: qa
+    runs-on: ubuntu-24.04
+    environment:
+      name: production # gate 3: approve to publish
+      url: https://github.com/${{ github.repository }}/releases # shown next to the job in the run
+    steps:
+    - name: Download the build
+      uses: actions/download-artifact@v8
+      with:
+        name: build
+        path: out
+
+    - name: Publish
+      run: |
+        echo "Published $(ls out) to the GitHub release and the website"
+
+  announce:
+    name: Announce
+    needs: publish
+    runs-on: ubuntu-24.04
+    environment: social # gate 4: approve to post; the social media tokens would be secrets of this environment only
+    steps:
+    - name: Post
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        echo "Posted the release ${VERSION} to the socials"
