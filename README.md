@@ -5,7 +5,8 @@ check, publish, announce. Each step is a job gated by a GitHub environment, so
 the run pauses before it until a reviewer approves, and stops if they reject.
 
 The workflow is [`.github/workflows/release.yml`](.github/workflows/release.yml).
-It only prints what it would do; the gates are the point.
+The build and the announce only print what they would do; the publish creates
+a real draft GitHub release. The gates are the point.
 
 ## How a gate works
 
@@ -30,7 +31,7 @@ reviewer:
 |--------------|----------------|-------------------------------------------|
 | `dev`        | the build      | start building this version               |
 | `qa`         | the spot check | QA looked at the build and it is fine     |
-| `production` | the publish    | put it on the GitHub release and the site |
+| `production` | the publish    | create the draft GitHub release; the comment is its notes |
 | `social`     | the announce   | post about it                             |
 
 ### In the web UI
@@ -69,10 +70,26 @@ Actions > Release > **Run workflow**, enter a version, run. Then:
    Approve `dev`. The build runs and uploads a small artifact.
 2. `QA spot check` waits. Download the artifact from the run page if you want
    to look at it, then approve or reject `qa`.
-3. `Publish` and `Announce` wait in turn.
+3. `Publish on GitHub` waits. Write the release notes as the approval comment
+   and approve `production`: a draft release "Release 1.2.3" with tag `v1.2.3`
+   appears under Releases, with the artifact attached and your comment as its
+   notes. The tag itself is only created when someone publishes the draft.
+4. `Announce` waits in turn.
 
 Try one run approving everything, and one rejecting at `qa`: the QA job fails,
 and publish and announce are skipped.
+
+## The approval comment
+
+The comment a reviewer leaves with an approval is kept in the run's review
+history, which a later job can read with the `GET
+/repos/OWNER/REPO/actions/runs/RUN_ID/approvals` endpoint. The script
+[`.github/scripts/approval_comment.sh`](.github/scripts/approval_comment.sh)
+prints the comment of the approval of a given environment for the current run.
+The job that uses it needs `actions: read` in its `permissions`.
+
+This turns the approval dialog into a small input form: whoever approves
+`production` writes the release notes there.
 
 ## What does not fit a gate
 

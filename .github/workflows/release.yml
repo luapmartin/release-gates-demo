@@ -62,22 +62,45 @@ jobs:
         echo "QA passed: a reviewer approved the qa environment"
 
   publish:
-    name: Publish
+    name: Publish on GitHub
     needs: qa
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write # to create the release
+      actions: read # to read the approval comment
     environment:
-      name: production # gate 3: approve to publish
-      url: https://github.com/${{ github.repository }}/releases # shown next to the job in the run
+      name: production # gate 3: approve to publish; the approval comment becomes the draft release notes
+      url: ${{ steps.release.outputs.url }} # shown next to the job in the run
     steps:
+    - name: Clone repository # for .github/scripts
+      uses: actions/checkout@v7
+
     - name: Download the build
       uses: actions/download-artifact@v8
       with:
         name: build
         path: out
 
-    - name: Publish
+    - name: Create the draft release # tag v<version>, not created until the draft is published
+      id: release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        VERSION: ${{ inputs.version }}
       run: |
-        echo "Published $(ls out) to the GitHub release and the website"
+        notes="$(.github/scripts/approval_comment.sh production)"
+        if [[ -z "${notes}" ]]; then
+          notes="Release ${VERSION}, build ${GITHUB_RUN_NUMBER}."
+        fi
+
+        url="$(gh release create "v${VERSION}" out/* \
+          --draft \
+          --title "Release ${VERSION}" \
+          --notes "${notes}" \
+          --target "${GITHUB_SHA}")"
+
+        echo "url=${url}" >> "${GITHUB_OUTPUT}"
+        echo "Draft release: ${url}"
+        echo "Notes: ${notes}"
 
   announce:
     name: Announce
