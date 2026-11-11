@@ -1,0 +1,24 @@
+name: caller test (failure() through a reusable workflow)
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    uses: ./.github/workflows/called_fail.yml
+  gate_not_failure:
+    needs: build
+    if: ${{ ! failure() && ! cancelled() }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "RAN with needs.build.result=${{ needs.build.result }}"
+  gate_result_success:
+    needs: build
+    if: ${{ needs.build.result == 'success' }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "RAN with needs.build.result=${{ needs.build.result }}"
+  debug:
+    needs: build
+    if: ${{ always() }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "needs.build.result=${{ needs.build.result }}"

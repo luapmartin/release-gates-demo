@@ -1,0 +1,12 @@
+name: called (one job fails)
+on:
+  workflow_call:
+jobs:
+  ok:
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo ok
+  bad:
+    runs-on: ubuntu-slim
+    steps:
+      - run: exit 1
