@@ -1,0 +1,11 @@
+name: mid (calls the failing one, like Build All calls the platforms)
+on:
+  workflow_call:
+jobs:
+  number:
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo number
+  platform:
+    needs: number
+    uses: ./.github/workflows/called_fail.yml

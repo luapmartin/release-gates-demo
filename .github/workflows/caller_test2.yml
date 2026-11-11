@@ -1,0 +1,29 @@
+name: caller test 2 (failure two levels down)
+on:
+  workflow_dispatch:
+jobs:
+  plan:
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo plan
+  build:
+    needs: plan
+    uses: ./.github/workflows/mid.yml
+  gate_not_failure:
+    needs: [plan, build]
+    if: ${{ ! failure() && ! cancelled() }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "RAN with needs.build.result=${{ needs.build.result }}"
+  gate_result_success:
+    needs: [plan, build]
+    if: ${{ needs.build.result == 'success' }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "RAN with needs.build.result=${{ needs.build.result }}"
+  debug:
+    needs: [plan, build]
+    if: ${{ always() }}
+    runs-on: ubuntu-slim
+    steps:
+      - run: echo "needs.build.result=${{ needs.build.result }}"
